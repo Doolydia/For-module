@@ -1,27 +1,48 @@
 library(GEOquery)
-library(oligo)
-library(oligoClasses)
 library(limma)
-library(tidyverse)
+
 library(dplyr)
 
+##Importing processed microarray data into R from GEO
 gse50737 <- getGEO('GSE50737')
 length(gse50737)
+
+#get ExpressionSet
 class(gse50737[[1]])
 gse50737 <- gse50737[[1]]
 
+#getting the raw data for the series
+library(oligo)
+library(oligoClasses)
+
+#I don't have an awsome connection, so I download it from GEO database
 wd <- file.path("/Users/zlana/Desktop/GSE50737")
+
+#use oligoClass to read CEL data
 gse50737_celdata <- read.celfiles(list.celfiles(wd,full.names=TRUE,listGzipped=TRUE))
+
+#get a pseudo-image of the chip intensities
 image(gse50737_celdata[,1])
 
+#find the variables of interest
+library(tidyverse)
 varLabels(gse50737)
+
+#the variables of interest are "tissue:ch1" and "treatment:ch1"
+#the sample accessions are in "geo_accession"
 gse50737$supplementary_file
+
+#use pData to get phenotype data
 pd <- pData(gse50737)
 pd['cel_file'] <- str_split(pd$supplementary_file,"/") %>% map_chr(tail,1)
 
+#re-read out CEL files to guarantee that they are in the correct order as the experimental data we have from getGEO
 gse50737_celdata <- read.celfiles(paste0('/Users/zlana/Desktop/GSE50737/',pd$cel_file),phenoData=phenoData(gse50737))
+
+#gotten the treatment conditions attached
 pData(gse50737_celdata)[,c("geo_accession","tissue:ch1","treatment:ch1")]
 
+#performs RMA normalisation
 gse50737_eset <- rma(gse50737_celdata)
 
 
