@@ -1,9 +1,5 @@
+#Importing processed microarray data into R from GEO
 library(GEOquery)
-library(limma)
-
-library(dplyr)
-
-##Importing processed microarray data into R from GEO
 gse50737 <- getGEO('GSE50737')
 length(gse50737)
 
@@ -45,56 +41,73 @@ pData(gse50737_celdata)[,c("geo_accession","tissue:ch1","treatment:ch1")]
 #performs RMA normalisation
 gse50737_eset <- rma(gse50737_celdata)
 
-
+library(dplyr)
 pd <- pData(gse50737_eset)
 pd <- rename(pd,tissue="tissue:ch1",treatment="treatment:ch1")
-pd$treatment <- as.factor(pd$treatment)
-levels(pd$treatment) <- c("Benzene poisoning","Benzene exposed","Control")
-pd$group <- as.factor(paste(pd$tissue,pd$treatment))
-levels(pd$group) <- c("Benzene.poisoning","Benzene.exposed","Control")
 
-design <- model.matrix(~ 0 + pd$group)
-colnames(design) <- levels(pd$group)
+#convert into factor
+pd$treatment <- as.factor(pd$treatment)
+
+#set levels of the factor
+levels(pd$treatment) <- c("Benzene poisoning","Benzene exposed","Control")
+
+#create a design representing the different treatments
+library(limma)
+design <- model.matrix(~ 0 + pd$treatment)
+colnames(design) <- levels(pd$treatment)
 design
 
+#make contrasts between three treatments
 contrasts_matrix <- makeContrasts(poisoning_with_exposed=Benzene.poisoning - Benzene.exposed,
                                   poisoning_with_control=Benzene.poisoning - Control,
                                   exposed_with_control=Benzene.exposed - Control,
                                   levels=design)
 
+#fits a linear model for every row of expression matrix
 gse50737_fit <- lmFit(gse50737_eset,design)
 gse50737_fit2 <- contrasts.fit(gse50737_fit,contrasts=contrasts_matrix)
+
+#borrows information about the distribution across genes to calculate a robust test statistic
 gse50737_fit2 <- eBayes(gse50737_fit2)
+
+#returns which tested features of an array pass the test criteria
 summary(decideTests(gse50737_fit2,lfc=1))
 
-
+#gene annotation
+#There is no annotation package for this dataset so we need to match the probe and gene
 BiocManager::install("org.Hs.eg.db")
 library(org.Hs.eg.db)
+
+#discover which keytypes can be passed in to select or keys as the keytype argument
 keytypes(org.Hs.eg.db)
-
 gpl <- getGEO('GPL16686', destdir=".")
+
+#GPL annotation format
 anno=gpl@dataTable@table
+
+#extract gene ID and GB_ACC
 probe2symbol=anno[,c(1,6)]
-
 probe2symbol=probe2symbol[probe2symbol[,2]!="",]
-
 gene_bridge=AnnotationDbi::select(org.Hs.eg.db, keys=probe2symbol[,2], 
-                                  columns=c("SYMBOL"), 
-                                  keytype="ACCNUM") 
-
+                                  columns=c("SYMBOL"), #target format
+                                  keytype="ACCNUM") #current format
+#match GB_ACC to symbol
 probe2symbol=dplyr::left_join(probe2symbol,gene_bridge,by=c("GB_ACC"="ACCNUM"))
-
 probe2symbol=probe2symbol[,-2]
 colnames(probe2symbol)=c("ID","Symbol")
+
+#remove unmatched cases
 probe2symbol=probe2symbol[!(probe2symbol[,2] %in% c("",NA,"---")),]
 
+#results of difference analysis
 ps <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
-
 deg <- data.frame(Probe=rownames(ps),
                   poisoning_with_exposed_logFC=ps[,"poisoning_with_exposed"],
                   poisoning_with_control_logFC=ps[,"poisoning_with_control"],
                   exposed_with_control_logFC=ps[,"exposed_with_control"],
                   P.Value=ps[,"P.Value"],FDR=ps[,"adj.P.Val"])
+                  
+#annotating gene symbols combined with GPL platform information
 deg=dplyr::left_join(deg,probe2symbol[,-3],by=c("Probe"="ID"))
 deg=na.omit(deg)
 rownames(deg)=1:nrow(deg)
