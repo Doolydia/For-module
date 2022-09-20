@@ -1,0 +1,79 @@
+library(GEOquery)
+library(oligo)
+library(oligoClasses)
+library(limma)
+library(tidyverse)
+library(dplyr)
+
+gse50737 <- getGEO('GSE50737')
+length(gse50737)
+class(gse50737[[1]])
+gse50737 <- gse50737[[1]]
+
+wd <- file.path("/Users/zlana/Desktop/GSE50737")
+gse50737_celdata <- read.celfiles(list.celfiles(wd,full.names=TRUE,listGzipped=TRUE))
+image(gse50737_celdata[,1])
+
+varLabels(gse50737)
+gse50737$supplementary_file
+pd <- pData(gse50737)
+pd['cel_file'] <- str_split(pd$supplementary_file,"/") %>% map_chr(tail,1)
+
+gse50737_celdata <- read.celfiles(paste0('/Users/zlana/Desktop/GSE50737/',pd$cel_file),phenoData=phenoData(gse50737))
+pData(gse50737_celdata)[,c("geo_accession","tissue:ch1","treatment:ch1")]
+
+gse50737_eset <- rma(gse50737_celdata)
+
+
+pd <- pData(gse50737_eset)
+pd <- rename(pd,tissue="tissue:ch1",treatment="treatment:ch1")
+pd$treatment <- as.factor(pd$treatment)
+levels(pd$treatment) <- c("Benzene poisoning","Benzene exposed","Control")
+pd$group <- as.factor(paste(pd$tissue,pd$treatment))
+levels(pd$group) <- c("Benzene.poisoning","Benzene.exposed","Control")
+
+design <- model.matrix(~ 0 + pd$group)
+colnames(design) <- levels(pd$group)
+design
+
+contrasts_matrix <- makeContrasts(poisoning_with_exposed=Benzene.poisoning - Benzene.exposed,
+                                  poisoning_with_control=Benzene.poisoning - Control,
+                                  exposed_with_control=Benzene.exposed - Control,
+                                  levels=design)
+
+gse50737_fit <- lmFit(gse50737_eset,design)
+gse50737_fit2 <- contrasts.fit(gse50737_fit,contrasts=contrasts_matrix)
+gse50737_fit2 <- eBayes(gse50737_fit2)
+summary(decideTests(gse50737_fit2,lfc=1))
+
+
+BiocManager::install("org.Hs.eg.db")
+library(org.Hs.eg.db)
+keytypes(org.Hs.eg.db)
+
+gpl <- getGEO('GPL16686', destdir=".")
+anno=gpl@dataTable@table
+probe2symbol=anno[,c(1,6)]
+
+probe2symbol=probe2symbol[probe2symbol[,2]!="",]
+
+gene_bridge=AnnotationDbi::select(org.Hs.eg.db, keys=probe2symbol[,2], 
+                                  columns=c("SYMBOL"), 
+                                  keytype="ACCNUM") 
+
+probe2symbol=dplyr::left_join(probe2symbol,gene_bridge,by=c("GB_ACC"="ACCNUM"))
+
+probe2symbol=probe2symbol[,-2]
+colnames(probe2symbol)=c("ID","Symbol")
+probe2symbol=probe2symbol[!(probe2symbol[,2] %in% c("",NA,"---")),]
+
+ps <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+
+deg <- data.frame(Probe=rownames(ps),
+                  poisoning_with_exposed_logFC=ps[,"poisoning_with_exposed"],
+                  poisoning_with_control_logFC=ps[,"poisoning_with_control"],
+                  exposed_with_control_logFC=ps[,"exposed_with_control"],
+                  P.Value=ps[,"P.Value"],FDR=ps[,"adj.P.Val"])
+deg=dplyr::left_join(deg,probe2symbol[,-3],by=c("Probe"="ID"))
+deg=na.omit(deg)
+rownames(deg)=1:nrow(deg)
