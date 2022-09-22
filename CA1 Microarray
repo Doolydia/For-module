@@ -134,7 +134,6 @@ glimpse(interesting_genes)
 volcanoplot(gse50737_fit2, coef=3, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
 points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
 
-#heatmap
 eset_of_interest <- gse50737_eset[rownames(interesting_genes),]
 heatmap(exprs(eset_of_interest))
 
