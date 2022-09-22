@@ -74,6 +74,29 @@ gse50737_fit2 <- eBayes(gse50737_fit2)
 #returns which tested features of an array pass the test criteria
 summary(decideTests(gse50737_fit2,lfc=1))
 
+#vocanoplot of the first contrast(Benzene.poisoning - Benzene.exposed)
+interesting_genes_1 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+volcanoplot(gse50737_fit2, coef=1, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_1)))
+points(interesting_genes_1[['poisoning_with_exposed']]),-log10(interesting_genes_1[['P.Value']]),col='red')
+
+#vocanoplot of the second contrast(Benzene.poisoning - Control)
+interesting_genes_2 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+volcanoplot(gse50737_fit2, coef=2, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_2)))
+points(interesting_genes_2[['poisoning_with_exposed']]),-log10(interesting_genes_2[['P.Value']]),col='red')
+
+#vocanoplot of the third contrast(Benzene.exposed - Control)
+interesting_genes_3 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+volcanoplot(gse50737_fit2, coef=3, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_3)))
+points(interesting_genes_3[['poisoning_with_exposed']]),-log10(interesting_genes_3[['P.Value']]),col='red')
+
+#heatmap
+eset_of_interest <- gse50737_eset[rownames(interesting_genes),]
+library(RColorBrewer)
+heatmap(exprs(eset_of_interest),
+        labCol=gse50737_eset[['treatment:ch1']] ,labRow=NA,
+        col       = rev(brewer.pal(10, "RdBu")),
+        distfun   = function(x) as.dist(1-cor(t(x))))
+
 #gene annotation
 #There is no annotation package for this dataset so we need to match the probe and gene
 BiocManager::install("org.Hs.eg.db")
@@ -113,32 +136,17 @@ deg=dplyr::left_join(deg,probe2symbol[,-3],by=c("Probe"="ID"))
 deg=na.omit(deg)
 rownames(deg)=1:nrow(deg)
 
-#vocanoplot of the first contrast(Benzene.poisoning - Benzene.exposed)
-volcanoplot(gse50737_fit2, coef = 1)
-interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
-glimpse(interesting_genes)
-volcanoplot(gse50737_fit2, coef=1, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
-points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
-
-#vocanoplot of the second contrast(Benzene.poisoning - Control)
-volcanoplot(gse50737_fit2, coef = 2)
-interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
-glimpse(interesting_genes)
-volcanoplot(gse50737_fit2, coef=2, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
-points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
-
-#vocanoplot of the third contrast(Benzene.exposed - Control)
-volcanoplot(gse50737_fit2, coef = 3)
-interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
-glimpse(interesting_genes)
-volcanoplot(gse50737_fit2, coef=3, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
-points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
-
-eset_of_interest <- gse50737_eset[rownames(interesting_genes),]
-heatmap(exprs(eset_of_interest))
-
-library(RColorBrewer)
-heatmap(exprs(eset_of_interest),
-        labCol=gse50737_eset[['treatment:ch1']] ,labRow=NA,
-        col       = rev(brewer.pal(10, "RdBu")),
-        distfun   = function(x) as.dist(1-cor(t(x))))
+##benzene_poisoning-control comparison
+interesting_genes_1[['ID']]=rownames(interesting_genes_1)
+interesting_genes_1 <- dplyr::inner_join(probe2symbol,interesting_genes_1,by="ID")
+upregulated_1 <- interesting_genes_1[interesting_genes_1$logFC>0,]
+downregulated_1 <- interesting_genes_1[interesting_genes_1$logFC<0,]
+write_excel_csv(upregulated_1 ,"upregulated_interesting_genes_1.csv")
+write_excel_csv(downregulated_1 ,"downregulated_interesting_genes_1.csv")
+##benzene_poisoning-benzene_exposed comparison
+interesting_genes_3[['ID']]=rownames(interesting_genes_3)
+interesting_genes_3 <- dplyr::inner_join(probe2symbol,interesting_genes_3,by="ID")
+upregulated_3 <- interesting_genes_3[interesting_genes_3$logFC>0,]
+downregulated_3 <- interesting_genes_3[interesting_genes_3$logFC<0,]
+write_excel_csv(upregulated_3 ,"upregulated_interesting_genes_3.csv")
+write_excel_csv(downregulated_3 ,"downregulated_interesting_genes_3.csv")
