@@ -50,7 +50,7 @@ pd <- rename(pd,tissue="tissue:ch1",treatment="treatment:ch1")
 pd$treatment <- as.factor(pd$treatment)
 
 #set levels of the factor
-levels(pd$treatment) <- c("Benzene exposed","Benzene poisoning","Control")
+levels(pd$treatment) <- c("Benzene.exposed","Benzene.poisoning","Control")
 
 #create a design representing the different treatments
 library(limma)
@@ -75,21 +75,22 @@ gse50737_fit2 <- eBayes(gse50737_fit2)
 summary(decideTests(gse50737_fit2,lfc=1))
 
 #vocanoplot of the first contrast(Benzene.poisoning - Benzene.exposed)
-interesting_genes_1 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+interesting_genes_1 <- topTable(gse50737_fit2,coef=1,number=Inf,p.value = 0.05,lfc=1)
 volcanoplot(gse50737_fit2, coef=1, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_1)))
-points(interesting_genes_1[['poisoning_with_exposed']]),-log10(interesting_genes_1[['P.Value']]),col='red')
+points(interesting_genes_1[['logFC']],-log10(interesting_genes_1[['P.Value']]),col='red')
 
 #vocanoplot of the second contrast(Benzene.poisoning - Control)
-interesting_genes_2 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+interesting_genes_2 <- topTable(gse50737_fit2,coef=2,number=Inf,p.value = 0.05,lfc=1)
 volcanoplot(gse50737_fit2, coef=2, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_2)))
-points(interesting_genes_2[['poisoning_with_exposed']]),-log10(interesting_genes_2[['P.Value']]),col='red')
+points(interesting_genes_2[['logFC']],-log10(interesting_genes_2[['P.Value']]),col='red')
 
 #vocanoplot of the third contrast(Benzene.exposed - Control)
-interesting_genes_3 <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+interesting_genes_3 <- topTable(gse50737_fit2,coef=3,number=Inf,p.value = 0.05,lfc=1)
 volcanoplot(gse50737_fit2, coef=3, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes_3)))
-points(interesting_genes_3[['poisoning_with_exposed']]),-log10(interesting_genes_3[['P.Value']]),col='red')
+points(interesting_genes_3[['logFC']],-log10(interesting_genes_3[['P.Value']]),col='red')
 
 #heatmap
+interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
 eset_of_interest <- gse50737_eset[rownames(interesting_genes),]
 library(RColorBrewer)
 heatmap(exprs(eset_of_interest),
@@ -130,23 +131,23 @@ deg <- data.frame(Probe=rownames(ps),
                   poisoning_with_control_logFC=ps[,"poisoning_with_control"],
                   exposed_with_control_logFC=ps[,"exposed_with_control"],
                   P.Value=ps[,"P.Value"],FDR=ps[,"adj.P.Val"])
-                  
+
 #annotating gene symbols combined with GPL platform information
 deg=dplyr::left_join(deg,probe2symbol[,-3],by=c("Probe"="ID"))
 deg=na.omit(deg)
 rownames(deg)=1:nrow(deg)
 
-##benzene_poisoning-control comparison
+##benzene_poisoning-benzene_exposed comparison
 interesting_genes_1[['ID']]=rownames(interesting_genes_1)
 interesting_genes_1 <- dplyr::inner_join(probe2symbol,interesting_genes_1,by="ID")
 upregulated_1 <- interesting_genes_1[interesting_genes_1$logFC>0,]
 downregulated_1 <- interesting_genes_1[interesting_genes_1$logFC<0,]
 write_excel_csv(upregulated_1 ,"upregulated_interesting_genes_1.csv")
 write_excel_csv(downregulated_1 ,"downregulated_interesting_genes_1.csv")
-##benzene_poisoning-benzene_exposed comparison
-interesting_genes_3[['ID']]=rownames(interesting_genes_3)
-interesting_genes_3 <- dplyr::inner_join(probe2symbol,interesting_genes_3,by="ID")
-upregulated_3 <- interesting_genes_3[interesting_genes_3$logFC>0,]
-downregulated_3 <- interesting_genes_3[interesting_genes_3$logFC<0,]
-write_excel_csv(upregulated_3 ,"upregulated_interesting_genes_3.csv")
-write_excel_csv(downregulated_3 ,"downregulated_interesting_genes_3.csv")
+##benzene_poisoning-control comparison
+interesting_genes_2[['ID']]=rownames(interesting_genes_2)
+interesting_genes_2 <- dplyr::inner_join(probe2symbol,interesting_genes_2,by="ID")
+upregulated_2 <- interesting_genes_2[interesting_genes_2$logFC>0,]
+downregulated_2 <- interesting_genes_2[interesting_genes_2$logFC<0,]
+write_excel_csv(upregulated_2 ,"upregulated_interesting_genes_2.csv")
+write_excel_csv(downregulated_2 ,"downregulated_interesting_genes_2.csv")
