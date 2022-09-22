@@ -49,7 +49,7 @@ pd <- rename(pd,tissue="tissue:ch1",treatment="treatment:ch1")
 pd$treatment <- as.factor(pd$treatment)
 
 #set levels of the factor
-levels(pd$treatment) <- c("Benzene poisoning","Benzene exposed","Control")
+levels(pd$treatment) <- c("Benzene exposed","Benzene poisoning","Control")
 
 #create a design representing the different treatments
 library(limma)
@@ -111,3 +111,34 @@ deg <- data.frame(Probe=rownames(ps),
 deg=dplyr::left_join(deg,probe2symbol[,-3],by=c("Probe"="ID"))
 deg=na.omit(deg)
 rownames(deg)=1:nrow(deg)
+
+#vocanoplot of the first contrast(Benzene.poisoning - Benzene.exposed)
+volcanoplot(gse50737_fit2, coef = 1)
+interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+glimpse(interesting_genes)
+volcanoplot(gse50737_fit2, coef=1, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
+points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
+
+#vocanoplot of the second contrast(Benzene.poisoning - Control)
+volcanoplot(gse50737_fit2, coef = 2)
+interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+glimpse(interesting_genes)
+volcanoplot(gse50737_fit2, coef=2, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
+points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
+
+#vocanoplot of the third contrast(Benzene.exposed - Control)
+volcanoplot(gse50737_fit2, coef = 3)
+interesting_genes <- topTable(gse50737_fit2,number=Inf,p.value = 0.05,lfc=1)
+glimpse(interesting_genes)
+volcanoplot(gse50737_fit2, coef=3, main=sprintf("%d features pass our cutoffs",nrow(interesting_genes)))
+points(log(interesting_genes[['poisoning_with_exposed']]),-log10(interesting_genes[['P.Value']]),col='red')
+
+#heatmap
+eset_of_interest <- gse50737_eset[rownames(interesting_genes),]
+heatmap(exprs(eset_of_interest))
+
+library(RColorBrewer)
+heatmap(exprs(eset_of_interest),
+        labCol=gse50737_eset[['treatment:ch1']] ,labRow=NA,
+        col       = rev(brewer.pal(10, "RdBu")),
+        distfun   = function(x) as.dist(1-cor(t(x))))
