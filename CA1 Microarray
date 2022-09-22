@@ -1,3 +1,4 @@
+#Group:Liu Yu, Du Kefan
 #Importing processed microarray data into R from GEO
 library(GEOquery)
 gse50737 <- getGEO('GSE50737')
